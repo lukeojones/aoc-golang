@@ -51,7 +51,7 @@ func main() {
 
 // Boilerplate: ReadInput reads the input file for the given year and day
 func readInput(year, day int) (string, error) {
-	filePath := fmt.Sprintf("aoc-%%d/Day%%d/input.bak.txt", year, day)
+	filePath := fmt.Sprintf("aoc-%%d/Day%%d/input.txt", year, day)
 	file, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Fatal(err)

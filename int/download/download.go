@@ -67,5 +67,19 @@ func GetPuzzlePart(year, day int) error {
 	}
 
 	fmt.Printf("Downloaded %d bytes and written to %s\n", written, inputPath)
+
+	// Create a placeholder for the test input too (as this is often useful)
+	testInputPath := filepath.Join(dir, "input.test.txt")
+	file, err = os.Create(testInputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, "### This is the Test Input ###\n")
+	if err != nil {
+		return fmt.Errorf("failed to write test file: %w", err)
+	}
+
 	return nil
 }

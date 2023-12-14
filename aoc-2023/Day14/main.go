@@ -20,11 +20,11 @@ func main() {
 		grid = append(grid, strings.Split(lines, ""))
 	}
 
-	loadsP1 := run(grid, 1, 1)
+	loadsP1 := run(grid, 0, 1)
 	loadsP2 := run(grid, 4, 2000)
 
 	fmt.Println("Solution to Part 1:", loadsP1[0])
-	fmt.Println("Solution to Part 2:", findNthTerm(loadsP2, 1_000_000_000, 10))
+	fmt.Println("Solution to Part 2:", findNthTerm(loadsP2, 1_000_000_000, 2))
 }
 
 func findNthTerm(seq []int, n, tolerance int) int {

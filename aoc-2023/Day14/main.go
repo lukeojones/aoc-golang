@@ -110,7 +110,7 @@ func roll(grid [][]string) {
 	}
 }
 
-func printGrid(grid [][]string, desc string) {
+func PrintGrid(grid [][]string, desc string) {
 	fmt.Println("=======", desc, "========")
 	for r := 0; r < len(grid); r++ {
 		for c := 0; c < len(grid[0]); c++ {

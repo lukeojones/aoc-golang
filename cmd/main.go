@@ -7,11 +7,11 @@ import (
 )
 
 func main() {
-	err := download.GetPuzzlePart(2023, 15)
+	err := download.GetPuzzlePart(2023, 16)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = boilerplate.GenerateBoilerplate(2023, 15)
+	err = boilerplate.GenerateBoilerplate(2023, 16)
 	if err != nil {
 		log.Fatal(err)
 	}

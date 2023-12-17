@@ -87,36 +87,18 @@ func main() {
 		}
 	}
 
-	//for r := 0; r < len(grid); r++ {
-	//	for c := 0; c < len(grid[0]); c++ {
-	//		fmt.Print(grid[r][c])
-	//	}
-	//	println()
-	//}
-
-	dijkstra := Dijkstra(grid, image.Point{0, 0})
-
-	ans := math.MaxInt64
-	for point, dirToDist := range dijkstra {
-		for _, stepToDist := range dirToDist {
-			for _, dist := range stepToDist {
-				if point.X == len(grid[0])-1 && point.Y == len(grid)-1 {
-					if dist < ans {
-						ans = dist
-					}
-				}
-			}
-		}
-	}
+	ansP1 := calculateHeatLoss(grid, 0, 3)
+	ansP2 := calculateHeatLoss(grid, 4, 10)
 
 	// Solution here
-	fmt.Println("Solution:", ans)
+	fmt.Println("Solution Part 1:", ansP1)
+	fmt.Println("Solution Part 2:", ansP2)
 }
 
-func Dijkstra(grid [][]int, start image.Point) map[image.Point]map[Direction]map[int]int {
+func calculateHeatLoss(grid [][]int, minStepsToTake, maxStepsToTake int) int {
 	openSet := &PriorityQueue{}
 	heap.Init(openSet)
-	startNode := &Node{position: start, dist: 0, direction: Right, stepsInDir: 0}
+	startNode := &Node{position: image.Point{}, dist: 0, direction: Right, stepsInDir: 0}
 	heap.Push(openSet, startNode)
 
 	visited := make(map[image.Point]map[Direction]map[int]int)
@@ -139,7 +121,7 @@ func Dijkstra(grid [][]int, start image.Point) map[image.Point]map[Direction]map
 
 		visited[currentNode.position][currentNode.direction][currentNode.stepsInDir] = currentNode.dist
 
-		for _, neighbor := range GetValidNeighbors(currentNode, grid) {
+		for _, neighbor := range GetValidNeighbours(currentNode, grid, minStepsToTake, maxStepsToTake) {
 			_, visited_ := visited[neighbor.position][neighbor.direction][neighbor.stepsInDir]
 			if !visited_ {
 				heap.Push(openSet, neighbor)
@@ -147,10 +129,22 @@ func Dijkstra(grid [][]int, start image.Point) map[image.Point]map[Direction]map
 		}
 	}
 
-	return visited // No path found
+	return GetHeatLossForCell(visited, image.Point{X: len(grid[0]) - 1, Y: len(grid) - 1})
 }
 
-func GetValidNeighbors(node *Node, grid [][]int) []*Node {
+func GetHeatLossForCell(visited map[image.Point]map[Direction]map[int]int, point image.Point) int {
+	ans := math.MaxInt64
+	for _, dirToDist := range visited[point] {
+		for _, dist := range dirToDist {
+			if dist < ans {
+				ans = dist
+			}
+		}
+	}
+	return ans
+}
+
+func GetValidNeighbours(node *Node, grid [][]int, minStepsToTake, maxStepsToTake int) []*Node {
 	neighbors := make([]*Node, 0)
 	for di, d := range dirs {
 		// Don't allow reverse
@@ -167,8 +161,8 @@ func GetValidNeighbors(node *Node, grid [][]int) []*Node {
 
 		isNewDir := int(node.direction) != di
 		isTargetReached := newPos.X == len(grid[0])-1 && newPos.Y == len(grid)-1
-		isMinStepsTaken := node.stepsInDir >= 4
-		isMaxStepsTaken := node.stepsInDir >= 10
+		isMinStepsTaken := node.stepsInDir >= minStepsToTake
+		isMaxStepsTaken := node.stepsInDir >= maxStepsToTake
 
 		// If can take more steps, increment cont steps and use same direction
 		if !isNewDir && !isMaxStepsTaken {

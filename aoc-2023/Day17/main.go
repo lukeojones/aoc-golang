@@ -18,6 +18,12 @@ var dirs = []image.Point{
 	{0, 1},  // Down
 	{-1, 0}, // Left
 }
+var reverseDirs = []Direction{
+	Down,  // Up
+	Left,  // Right
+	Up,    // Down
+	Right, // Left
+}
 
 const (
 	Up Direction = iota
@@ -117,9 +123,6 @@ func Dijkstra(grid [][]int, start image.Point) map[image.Point]map[Direction]map
 
 	for openSet.Len() > 0 {
 		currentNode := heap.Pop(openSet).(*Node)
-		//if currentNode.position == target {
-		//	return currentNode // Path found
-		//}
 
 		// Initialize nested maps if not already done
 		if visited[currentNode.position] == nil {
@@ -151,7 +154,7 @@ func GetValidNeighbors(node *Node, grid [][]int) []*Node {
 	neighbors := make([]*Node, 0)
 	for di, d := range dirs {
 		// Don't allow reverse
-		if (di+2)%4 == int(node.direction) {
+		if di == int(reverseDirs[node.direction]) {
 			continue
 		}
 
@@ -162,8 +165,13 @@ func GetValidNeighbors(node *Node, grid [][]int) []*Node {
 			continue
 		}
 
-		// If not more than 3 continuous steps, increment cont steps and use same direction
-		if int(node.direction) == di && node.stepsInDir < 3 {
+		isNewDir := int(node.direction) != di
+		isTargetReached := newPos.X == len(grid[0])-1 && newPos.Y == len(grid)-1
+		isMinStepsTaken := node.stepsInDir >= 4
+		isMaxStepsTaken := node.stepsInDir >= 10
+
+		// If can take more steps, increment cont steps and use same direction
+		if !isNewDir && !isMaxStepsTaken {
 			neighbors = append(neighbors, &Node{
 				position:   newPos,
 				dist:       node.dist + grid[newPos.Y][newPos.X],
@@ -171,8 +179,8 @@ func GetValidNeighbors(node *Node, grid [][]int) []*Node {
 				stepsInDir: node.stepsInDir + 1,
 			})
 			continue
-		} else if int(node.direction) != di {
-			// Change in direction, reset continuous steps
+		} else if (isNewDir || isTargetReached) && isMinStepsTaken {
+			// If change in direction, reset continuous steps
 			neighbors = append(neighbors, &Node{
 				position:   newPos,
 				dist:       node.dist + grid[newPos.Y][newPos.X],

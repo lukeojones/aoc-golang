@@ -35,6 +35,18 @@ type Rating struct {
 	s int
 }
 
+type RatingRange struct {
+	destWorkflowId string
+	Xmin           int
+	Xmax           int
+	Mmin           int
+	Mmax           int
+	Amin           int
+	Amax           int
+	Smin           int
+	Smax           int
+}
+
 func main() {
 	input, err := readInput(2023, 19)
 	if err != nil {
@@ -48,6 +60,122 @@ func main() {
 	println("workflows", len(workflows))
 	println("ratings", len(ratings))
 
+	ansP1 := solveP1(ratings, workflows)
+	fmt.Println("Solution:", ansP1)
+
+	//Part 2
+	workflows = parseWorkflows(parts[0])
+	rr := RatingRange{
+		destWorkflowId: "in",
+		Xmin:           1,
+		Xmax:           4000,
+		Mmin:           1,
+		Mmax:           4000,
+		Amin:           1,
+		Amax:           4000,
+		Smin:           1,
+		Smax:           4000,
+	}
+
+	/**
+	px{a<2006:qkq,m>2090:A,rfg}
+	pv{a>1716:R,A}
+	lnx{m>1548:A,A}
+	rfg{s<537:gd,x>2440:R,A}
+	qs{s>3448:A,lnx}
+	qkq{x<1416:A,crn}
+	crn{x>2662:A,R}
+	in{s<1351:px,qqz}
+	qqz{s>2770:qs,m<1801:hdj,R}
+	gd{a>3333:R,R}
+	hdj{m>838:A,pv}
+	*/
+	accepted := []RatingRange{}
+	rejected := []RatingRange{}
+	unprocessed := []RatingRange{rr}
+
+	for len(unprocessed) > 0 {
+		ratingRange := unprocessed[0]
+		unprocessed = unprocessed[1:]
+
+		workflow := workflows[ratingRange.destWorkflowId]
+		for workflow.id != "A" && workflow.id != "R" {
+			for _, rule := range workflow.rules {
+				if rule.category == "FINAL RULE" {
+					workflow = workflows[rule.nextWorkflow]
+					ratingRange.destWorkflowId = rule.nextWorkflow
+					break
+				}
+
+				fieldMinValue, fieldMaxValue, _ := getFieldBounds(&ratingRange, strings.ToUpper(rule.category))
+				if rule.operator == "<" {
+					if fieldMinValue < rule.limit && fieldMaxValue < rule.limit {
+						// Everything is in range, so pass the entire set to the next workflow
+						rrn := ratingRange
+						rrn.destWorkflowId = rule.nextWorkflow
+						unprocessed = append(unprocessed, rrn)
+					} else if fieldMinValue < rule.limit && fieldMaxValue > rule.limit {
+						//Split the set into two - pass and fail
+
+						// Passes go to the next workflow via unprocessed
+						rrn1 := ratingRange
+						setFieldValue(&rrn1, strings.ToUpper(rule.category)+"max", rule.limit-1)
+						rrn1.destWorkflowId = rule.nextWorkflow
+						unprocessed = append(unprocessed, rrn1)
+
+						//Failures go to the next rule via staying loop
+						rrn2 := ratingRange
+						setFieldValue(&rrn2, strings.ToUpper(rule.category)+"min", rule.limit)
+						ratingRange = rrn2
+					} else if fieldMinValue > rule.limit && fieldMaxValue > rule.limit {
+						//Everything is out of range, so pass the entire set to the next rule via ?
+						//no op - just leave ratingRange as it is
+					}
+				} else if rule.operator == ">" {
+					if fieldMinValue > rule.limit && fieldMaxValue > rule.limit {
+						// Everything is in range, so pass the entire set to the next workflow
+						rrn := ratingRange
+						rrn.destWorkflowId = rule.nextWorkflow
+						unprocessed = append(unprocessed, rrn)
+					} else if fieldMinValue < rule.limit && fieldMaxValue > rule.limit {
+						//Split the set into two - pass and fail
+
+						// Passes go to the next workflow via unprocessed
+						rrn1 := ratingRange
+						setFieldValue(&rrn1, strings.ToUpper(rule.category)+"min", rule.limit+1)
+						rrn1.destWorkflowId = rule.nextWorkflow
+						unprocessed = append(unprocessed, rrn1)
+
+						//Failures go to the next rule via staying loop
+						rrn2 := ratingRange
+						setFieldValue(&rrn2, strings.ToUpper(rule.category)+"max", rule.limit)
+						ratingRange = rrn2
+					} else if fieldMinValue > rule.limit && fieldMaxValue > rule.limit {
+						//Everything is out of range, so pass the entire set to the next rule via ?
+						//no op - just leave ratingRange as it is
+					}
+				}
+			}
+		}
+
+		if workflow.id == "A" {
+			accepted = append(accepted, ratingRange)
+		} else if workflow.id == "R" {
+			rejected = append(rejected, ratingRange)
+		}
+	}
+
+	ansP2 := 0
+	for _, ac := range accepted {
+		ansP2 += (ac.Xmax - ac.Xmin + 1) * (ac.Mmax - ac.Mmin + 1) * (ac.Amax - ac.Amin + 1) * (ac.Smax - ac.Smin + 1)
+	}
+
+	// Solution here
+	println("accepted", len(accepted))
+	println("Solution to P2", ansP2)
+}
+
+func solveP1(ratings []Rating, workflows map[string]Workflow) int {
 	accepted := []Rating{}
 	rejected := []Rating{}
 
@@ -57,17 +185,10 @@ func main() {
 		unprocessed = unprocessed[1:]
 
 		workflow := workflows["in"]
-		for workflow.id != "" {
+		for workflow.id != "A" && workflow.id != "R" {
 			for _, rule := range workflow.rules {
 				if rule.category == "FINAL RULE" {
-					workflow = Workflow{}
-					if rule.nextWorkflow == "A" {
-						accepted = append(accepted, rating)
-					} else if rule.nextWorkflow == "R" {
-						rejected = append(rejected, rating)
-					} else {
-						workflow = workflows[rule.nextWorkflow]
-					}
+					workflow = workflows[rule.nextWorkflow]
 					break
 				}
 				fieldValue, err := getFieldValue(&rating, rule.category)
@@ -75,28 +196,19 @@ func main() {
 					panic(err)
 				}
 				if rule.operator == "<" && fieldValue < rule.limit {
-					workflow = Workflow{}
-					if rule.nextWorkflow == "A" {
-						accepted = append(accepted, rating)
-					} else if rule.nextWorkflow == "R" {
-						rejected = append(rejected, rating)
-					} else {
-						workflow = workflows[rule.nextWorkflow]
-					}
+					workflow = workflows[rule.nextWorkflow]
 					break
 				}
 				if rule.operator == ">" && fieldValue > rule.limit {
-					workflow = Workflow{}
-					if rule.nextWorkflow == "A" {
-						accepted = append(accepted, rating)
-					} else if rule.nextWorkflow == "R" {
-						rejected = append(rejected, rating)
-					} else {
-						workflow = workflows[rule.nextWorkflow]
-					}
+					workflow = workflows[rule.nextWorkflow]
 					break
 				}
 			}
+		}
+		if workflow.id == "A" {
+			accepted = append(accepted, rating)
+		} else if workflow.id == "R" {
+			rejected = append(rejected, rating)
 		}
 	}
 
@@ -104,8 +216,8 @@ func main() {
 	for _, r := range accepted {
 		ansP1 += r.x + r.m + r.a + r.s
 	}
-	// Solution here
-	fmt.Println("Solution:", ansP1)
+
+	return ansP1
 }
 
 func parseRatings(ratingLines string) []Rating {
@@ -183,6 +295,16 @@ func parseWorkflows(workflowLines string) map[string]Workflow {
 			rules: rules,
 		}
 	}
+
+	workflows["A"] = Workflow{
+		id:    "A",
+		rules: []Rule{},
+	}
+	workflows["R"] = Workflow{
+		id:    "R",
+		rules: []Rule{},
+	}
+
 	return workflows
 }
 
@@ -199,6 +321,42 @@ func getFieldValue(r *Rating, field string) (int, error) {
 	}
 
 	return int(fieldValue.Int()), nil
+}
+
+func setFieldValue(r *RatingRange, field string, value int) error {
+	v := reflect.ValueOf(r).Elem()
+	fieldValue := v.FieldByName(field)
+
+	if !fieldValue.IsValid() {
+		return fmt.Errorf("no such field: %s in obj", field)
+	}
+
+	if !fieldValue.CanSet() {
+		return fmt.Errorf("cannot set field: %s", field)
+	}
+
+	if fieldValue.Kind() != reflect.Int {
+		return fmt.Errorf("field: %s is not an int", field)
+	}
+
+	fieldValue.SetInt(int64(value))
+	return nil
+}
+
+func getFieldBounds(r *RatingRange, field string) (int, int, error) {
+	val := reflect.ValueOf(r).Elem()
+	fieldMinValue := val.FieldByName(field + "min")
+	fieldMaxValue := val.FieldByName(field + "max")
+
+	if !fieldMinValue.IsValid() {
+		return 0, 0, fmt.Errorf("no such field: %s in obj", field)
+	}
+
+	if !fieldMaxValue.CanInt() {
+		return 0, 0, fmt.Errorf("cannot convert field: %s to int", field)
+	}
+
+	return int(fieldMinValue.Int()), int(fieldMaxValue.Int()), nil
 }
 
 func toInt(s string) int {

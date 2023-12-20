@@ -36,15 +36,22 @@ type Rating struct {
 }
 
 type RatingRange struct {
-	destWorkflowId string
-	Xmin           int
-	Xmax           int
-	Mmin           int
-	Mmax           int
-	Amin           int
-	Amax           int
-	Smin           int
-	Smax           int
+	destWorkflowId                                 string
+	Xmin, Xmax, Mmin, Mmax, Amin, Amax, Smin, Smax int
+}
+
+func initialRatingRange() RatingRange {
+	return RatingRange{
+		destWorkflowId: "in",
+		Xmin:           1,
+		Xmax:           4000,
+		Mmin:           1,
+		Mmax:           4000,
+		Amin:           1,
+		Amax:           4000,
+		Smin:           1,
+		Smax:           4000,
+	}
 }
 
 func main() {
@@ -57,43 +64,24 @@ func main() {
 	workflows := parseWorkflows(parts[0])
 	ratings := parseRatings(parts[1])
 
-	println("workflows", len(workflows))
-	println("ratings", len(ratings))
-
 	ansP1 := solveP1(ratings, workflows)
-	fmt.Println("Solution:", ansP1)
+	fmt.Println("Solution to Part 1:", ansP1)
 
 	//Part 2
 	workflows = parseWorkflows(parts[0])
-	rr := RatingRange{
-		destWorkflowId: "in",
-		Xmin:           1,
-		Xmax:           4000,
-		Mmin:           1,
-		Mmax:           4000,
-		Amin:           1,
-		Amax:           4000,
-		Smin:           1,
-		Smax:           4000,
+	ansP2 := solveP2(workflows)
+
+	println("Solution to Part 2", ansP2)
+	if ansP2 != 125317461667458 {
+		panic("Wrong answer")
 	}
+}
 
-	/**
-	px{a<2006:qkq,m>2090:A,rfg}
-	pv{a>1716:R,A}
-	lnx{m>1548:A,A}
-	rfg{s<537:gd,x>2440:R,A}
-	qs{s>3448:A,lnx}
-	qkq{x<1416:A,crn}
-	crn{x>2662:A,R}
-	in{s<1351:px,qqz}
-	qqz{s>2770:qs,m<1801:hdj,R}
-	gd{a>3333:R,R}
-	hdj{m>838:A,pv}
-	*/
-	accepted := []RatingRange{}
-	rejected := []RatingRange{}
+func solveP2(workflows map[string]Workflow) int {
+	var accepted []RatingRange
+
+	rr := initialRatingRange()
 	unprocessed := []RatingRange{rr}
-
 	for len(unprocessed) > 0 {
 		ratingRange := unprocessed[0]
 		unprocessed = unprocessed[1:]
@@ -160,19 +148,14 @@ func main() {
 
 		if workflow.id == "A" {
 			accepted = append(accepted, ratingRange)
-		} else if workflow.id == "R" {
-			rejected = append(rejected, ratingRange)
 		}
 	}
 
-	ansP2 := 0
+	ans := 0
 	for _, ac := range accepted {
-		ansP2 += (ac.Xmax - ac.Xmin + 1) * (ac.Mmax - ac.Mmin + 1) * (ac.Amax - ac.Amin + 1) * (ac.Smax - ac.Smin + 1)
+		ans += (ac.Xmax - ac.Xmin + 1) * (ac.Mmax - ac.Mmin + 1) * (ac.Amax - ac.Amin + 1) * (ac.Smax - ac.Smin + 1)
 	}
-
-	// Solution here
-	println("accepted", len(accepted))
-	println("Solution to P2", ansP2)
+	return ans
 }
 
 func solveP1(ratings []Rating, workflows map[string]Workflow) int {
@@ -257,17 +240,14 @@ func parseRatings(ratingLines string) []Rating {
 func parseWorkflows(workflowLines string) map[string]Workflow {
 	workflows := make(map[string]Workflow)
 	for _, wf := range strings.Split(workflowLines, "\n") {
-		//px{a<2006:qkq,m>2090:A,rfg}
 		id := strings.Split(wf, "{")[0]
 		ruleSection := strings.Split(strings.Split(wf, "{")[1], "}")[0]
 		ruleTokens := strings.Split(ruleSection, ",")
-		rules := make([]Rule, 0)
+		var rules []Rule
 		for _, rt := range ruleTokens {
 			condition := strings.Split(rt, ":")[0]
 			operatorIndex := strings.IndexAny(condition, "<>")
 			if operatorIndex == -1 || operatorIndex == 0 || operatorIndex == len(condition)-1 {
-				//panic("Invalid operator")
-				// THIS IS A FINAL RULE
 				rules = append(rules, Rule{
 					category:     "FINAL RULE",
 					operator:     "",
@@ -281,8 +261,6 @@ func parseWorkflows(workflowLines string) map[string]Workflow {
 			limit := condition[operatorIndex+1:]
 
 			nextWorkflowId := strings.Split(rt, ":")[1]
-			//fmt.Println(category, operator)
-			println("id", id, "category", category, "operator", operator, "limit", limit, "nextWorkflowId", nextWorkflowId)
 			rules = append(rules, Rule{
 				category:     category,
 				operator:     operator,

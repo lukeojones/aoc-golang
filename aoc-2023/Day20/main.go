@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -14,16 +15,8 @@ func main() {
 		return
 	}
 
-	/*
-	   broadcaster -> a, b, c
-	   %a -> b
-	   %b -> c
-	   %c -> inv
-	   &inv -> a
-	*/
-
-	periods := make(map[string][]int)
-
+	modulesToMonitor := []string{"tx", "gc", "kp", "vg"}
+	monitorSignals := make(map[string][]int)
 	modules := make(map[string]Module)
 	lines := strings.Split(input, "\n")
 	for _, line := range lines {
@@ -40,21 +33,11 @@ func main() {
 			m.moduleName = module[1:]
 		}
 		m.destinationModuleNames = destinations
-		//fmt.Println(parts)
-		//fmt.Println(m)
 		modules[m.moduleName] = m
 	}
 
-	modules["button"] = Module{
-		moduleName:             "button",
-		moduleType:             "button",
-		destinationModuleNames: []string{"broadcaster"},
-	}
-	modules["output"] = Module{
-		moduleName:             "output",
-		moduleType:             "output",
-		destinationModuleNames: []string{},
-	}
+	modules["button"] = CreateButtonModule()
+	modules["output"] = CreateOutputModule()
 
 	// Connect everything
 	for _, module := range modules {
@@ -66,21 +49,16 @@ func main() {
 		}
 	}
 
-	low, high, buttonPresses := 0, 0, 1
-	//MAX_BUTTON_PRESSES := 1000
-	MAX_BUTTON_PRESSES := 1000000
+	low, high, bp := 0, 0, 1
+	MaxPressPartOne := 1000
+	MaxPressPartTwo := 10000
 
-	buttonPress := Action{
-		signal:      false,
-		destination: "broadcaster",
-	}
-
-	unprocessed := []Action{buttonPress}
+	unprocessed := []Action{CreateButtonPressAction()}
 	for len(unprocessed) > 0 {
 		action := unprocessed[0]
 		unprocessed = unprocessed[1:]
 
-		if action.destination != "button" {
+		if action.destination != "button" && bp <= MaxPressPartOne {
 			if action.signal == true {
 				high++
 			} else {
@@ -88,43 +66,119 @@ func main() {
 			}
 		}
 
-		if action.destination == "rx" && action.signal == false {
-			println("Button Presses Reached:", buttonPresses)
-			break
-		}
-
-		if (action.destination == "tx" || action.destination == "gc" || action.destination == "kp" || action.destination == "vg") && action.signal == false {
-			periods[action.destination] = append(periods[action.destination], buttonPresses)
+		if (slices.Contains(modulesToMonitor, action.destination)) && !action.signal {
+			monitorSignals[action.destination] = append(monitorSignals[action.destination], bp)
 		}
 
 		destinationModule := modules[action.destination]
 		actions := destinationModule.processAction(action, modules)
 		unprocessed = append(unprocessed, actions...)
 
-		if len(unprocessed) == 0 && buttonPresses < MAX_BUTTON_PRESSES {
-			buttonPresses++
-			unprocessed = append(unprocessed, buttonPress)
-			//println("Button pressed:", buttonPresses)
+		if len(unprocessed) == 0 && bp < MaxPressPartTwo {
+			bp++
+			unprocessed = append(unprocessed, CreateButtonPressAction())
 		}
 	}
 
-	//println("Low:", low, "High:", high)
 	ansP1 := low * high
 
-	nums := []int{}
-	for _, v := range periods {
+	var nums []int
+	for _, v := range monitorSignals {
 		nums = append(nums, v[0])
 	}
 
 	ansP2 := lcmArr(nums)
 
 	// Solution here
-	fmt.Println("Solution Part 1:", ansP1)
-	fmt.Println("Solution Part 2:", ansP2)
+	fmt.Println("Solution Part 1:", ansP1) //681194780
+	fmt.Println("Solution Part 2:", ansP2) //238593356738827
+}
+
+func CreateOutputModule() Module {
+	return Module{
+		moduleName:             "output",
+		moduleType:             "output",
+		destinationModuleNames: []string{},
+	}
+}
+
+func CreateButtonModule() Module {
+	return Module{
+		moduleName:             "button",
+		moduleType:             "button",
+		destinationModuleNames: []string{"broadcaster"},
+	}
+}
+
+func CreateButtonPressAction() Action {
+	buttonPress := Action{
+		signal:      false,
+		destination: "broadcaster",
+	}
+	return buttonPress
+}
+
+type Action struct {
+	signal      bool
+	destination string
+}
+
+type Module struct {
+	moduleName             string
+	moduleType             string
+	destinationModuleNames []string
+	inputModuleNames       []string
+	state                  bool
+}
+
+func (m *Module) processAction(action Action, modules map[string]Module) []Action {
+	var actions []Action
+	if m.moduleType == "broadcaster" {
+		m.state = action.signal
+		for _, destination := range m.destinationModuleNames {
+			actions = append(actions, Action{
+				signal:      m.state,
+				destination: destination,
+			})
+		}
+	} else if m.moduleType == "%" {
+		// Set state to flip if input it low
+		if action.signal == false {
+			m.state = !m.state
+			for _, destination := range m.destinationModuleNames {
+				actions = append(actions, Action{
+					signal:      m.state,
+					destination: destination,
+				})
+			}
+		}
+	} else if m.moduleType == "&" {
+		//conjunction modules send LOW input only if ALL inputs are HIGH
+		newState := false
+		for _, input := range m.inputModuleNames {
+			module := modules[input]
+			if module.state == false {
+				newState = true
+				break
+			}
+		}
+		m.state = newState
+
+		for _, destination := range m.destinationModuleNames {
+			actions = append(actions, Action{
+				signal:      m.state,
+				destination: destination,
+			})
+		}
+	} else if m.moduleType == "output" {
+		m.state = action.signal
+	}
+	modules[m.moduleName] = *m
+	return actions
 }
 
 func lcmArr(nums []int) int {
-	var res int = 1
+	var res = 1
 	for _, num := range nums {
 		res = lcm(res, num)
 	}
@@ -140,85 +194,6 @@ func gcd(a, b int) int {
 		a, b = b, a%b
 	}
 	return a
-}
-
-type Module struct {
-	moduleName             string
-	moduleType             string
-	destinationModuleNames []string
-	inputModuleNames       []string
-	state                  bool
-}
-
-type Action struct {
-	signal      bool
-	destination string
-}
-
-func (m *Module) processAction(action Action, modules map[string]Module) []Action {
-	var actions []Action
-	if m.moduleType == "broadcaster" {
-		// Send signal to all destinations
-		for _, destination := range m.destinationModuleNames {
-			//println("Sending signal to", destination, " = ", action.signal, "from", m.moduleName)
-			actions = append(actions, Action{
-				signal:      action.signal,
-				destination: destination,
-			})
-		}
-		modules[m.moduleName] = *m
-		return actions
-	} else if m.moduleType == "%" {
-		// Set state to flip if input it low
-		if action.signal == false {
-			m.state = !m.state
-			// Send signal to all destinations
-			for _, destination := range m.destinationModuleNames {
-				//println("Sending signal to", destination, " = ", m.state, "from", m.moduleName)
-				actions = append(actions, Action{
-					signal:      m.state,
-					destination: destination,
-				})
-			}
-		}
-		modules[m.moduleName] = *m
-		return actions
-	} else if m.moduleType == "&" {
-		// Set state to true initially
-		state := false
-
-		// Check if all inputs are high, otherwise set state to false
-		for _, input := range m.inputModuleNames {
-			module := modules[input]
-			if module.state == false {
-				state = true
-				break
-			}
-		}
-
-		// Actually set the state
-		m.state = state
-
-		// Send signal to all destinations
-		for _, destination := range m.destinationModuleNames {
-			//println("Sending signal to", destination, " = ", m.state, "from", m.moduleName)
-			actions = append(actions, Action{
-				signal:      m.state,
-				destination: destination,
-			})
-		}
-		modules[m.moduleName] = *m
-		return actions
-	} else if m.moduleType == "output" {
-		m.state = action.signal
-		//println("Output:", m.state)
-		modules[m.moduleName] = *m
-		return actions
-	} else {
-		//do nothing
-		return actions
-	}
-	panic("Unknown module type" + m.moduleType)
 }
 
 // Boilerplate: ReadInput reads the input file for the given year and day

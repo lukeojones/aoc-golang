@@ -17,14 +17,14 @@ func main() {
 
 	modulesToMonitor := []string{"tx", "gc", "kp", "vg"}
 	monitorSignals := make(map[string][]int)
-	modules := make(map[string]Module)
+	modules := make(map[string]*Module)
 	lines := strings.Split(input, "\n")
 	for _, line := range lines {
 		parts := strings.Split(line, " -> ")
 		module := parts[0]
 		destinations := strings.Split(parts[1], ", ")
 
-		m := Module{}
+		m := &Module{}
 		if module == "broadcaster" {
 			m.moduleType = "broadcaster"
 			m.moduleName = "broadcaster"
@@ -44,14 +44,16 @@ func main() {
 		destinations := module.destinationModuleNames
 		for _, destination := range destinations {
 			m := modules[destination]
-			m.inputModuleNames = append(m.inputModuleNames, module.moduleName)
-			modules[destination] = m
+			if m != nil {
+				m.inputModuleNames = append(m.inputModuleNames, module.moduleName)
+				modules[destination] = m
+			}
 		}
 	}
 
 	low, high, bp := 0, 0, 1
 	MaxPressPartOne := 1000
-	MaxPressPartTwo := 10000
+	MaxPressPartTwo := 1000000
 
 	unprocessed := []Action{CreateButtonPressAction()}
 	for len(unprocessed) > 0 {
@@ -73,8 +75,10 @@ func main() {
 		}
 
 		destinationModule := modules[action.destination]
-		actions := destinationModule.processAction(action, modules)
-		unprocessed = append(unprocessed, actions...)
+		if destinationModule != nil {
+			actions := destinationModule.processAction(action, modules)
+			unprocessed = append(unprocessed, actions...)
+		}
 
 		if len(unprocessed) == 0 && bp < MaxPressPartTwo {
 			unprocessed = append(unprocessed, CreateButtonPressAction())
@@ -94,16 +98,16 @@ func main() {
 	fmt.Println("Solution Part 2:", ansP2) //238593356738827
 }
 
-func CreateOutputModule() Module {
-	return Module{
+func CreateOutputModule() *Module {
+	return &Module{
 		moduleName:             "output",
 		moduleType:             "output",
 		destinationModuleNames: []string{},
 	}
 }
 
-func CreateButtonModule() Module {
-	return Module{
+func CreateButtonModule() *Module {
+	return &Module{
 		moduleName:             "button",
 		moduleType:             "button",
 		destinationModuleNames: []string{"broadcaster"},
@@ -131,7 +135,7 @@ type Module struct {
 	state                  bool
 }
 
-func (m *Module) processAction(action Action, modules map[string]Module) []Action {
+func (m *Module) processAction(action Action, modules map[string]*Module) []Action {
 	var actions []Action
 	propagate := false
 	switch m.moduleType {
@@ -160,8 +164,6 @@ func (m *Module) processAction(action Action, modules map[string]Module) []Actio
 	case "output":
 		m.state = action.signal
 	}
-
-	modules[m.moduleName] = *m
 
 	if propagate {
 		for _, destination := range m.destinationModuleNames {

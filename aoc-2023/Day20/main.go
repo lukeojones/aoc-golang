@@ -58,14 +58,16 @@ func main() {
 		action := unprocessed[0]
 		unprocessed = unprocessed[1:]
 
+		// Part One
 		if action.destination != "button" && bp <= MaxPressPartOne {
-			if action.signal == true {
+			if action.signal {
 				high++
 			} else {
 				low++
 			}
 		}
 
+		//Part 2
 		if (slices.Contains(modulesToMonitor, action.destination)) && !action.signal {
 			monitorSignals[action.destination] = append(monitorSignals[action.destination], bp)
 		}
@@ -75,8 +77,8 @@ func main() {
 		unprocessed = append(unprocessed, actions...)
 
 		if len(unprocessed) == 0 && bp < MaxPressPartTwo {
-			bp++
 			unprocessed = append(unprocessed, CreateButtonPressAction())
+			bp++
 		}
 	}
 
@@ -86,10 +88,8 @@ func main() {
 	for _, v := range monitorSignals {
 		nums = append(nums, v[0])
 	}
-
 	ansP2 := lcmArr(nums)
 
-	// Solution here
 	fmt.Println("Solution Part 1:", ansP1) //681194780
 	fmt.Println("Solution Part 2:", ansP2) //238593356738827
 }
@@ -133,26 +133,18 @@ type Module struct {
 
 func (m *Module) processAction(action Action, modules map[string]Module) []Action {
 	var actions []Action
-	if m.moduleType == "broadcaster" {
+	propagate := false
+	switch m.moduleType {
+	case "broadcaster":
 		m.state = action.signal
-		for _, destination := range m.destinationModuleNames {
-			actions = append(actions, Action{
-				signal:      m.state,
-				destination: destination,
-			})
-		}
-	} else if m.moduleType == "%" {
-		// Set state to flip if input it low
+		propagate = true
+	case "%":
+		// Set state to flip if input is LOW
 		if action.signal == false {
 			m.state = !m.state
-			for _, destination := range m.destinationModuleNames {
-				actions = append(actions, Action{
-					signal:      m.state,
-					destination: destination,
-				})
-			}
+			propagate = true
 		}
-	} else if m.moduleType == "&" {
+	case "&":
 		//conjunction modules send LOW input only if ALL inputs are HIGH
 		newState := false
 		for _, input := range m.inputModuleNames {
@@ -163,17 +155,23 @@ func (m *Module) processAction(action Action, modules map[string]Module) []Actio
 			}
 		}
 		m.state = newState
+		propagate = true
 
+	case "output":
+		m.state = action.signal
+	}
+
+	modules[m.moduleName] = *m
+
+	if propagate {
 		for _, destination := range m.destinationModuleNames {
 			actions = append(actions, Action{
 				signal:      m.state,
 				destination: destination,
 			})
 		}
-	} else if m.moduleType == "output" {
-		m.state = action.signal
 	}
-	modules[m.moduleName] = *m
+
 	return actions
 }
 

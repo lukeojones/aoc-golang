@@ -37,12 +37,20 @@ func main() {
 	println("Grid size:", len(grid), "x", len(grid[0]), " = ", len(grid)*len(grid[0]))
 
 	// do bfs to find all possible paths to '.' from 'S'
-	ans := bfs(grid, start, 64)
+	ansP1 := bfs(grid, start, 64)
 
-	PrintGrid(grid, "Input")
+	//Part 2 - Sequence Spotting for 1x, 2x and 3x step ranges sizes
+	innerWidth := 65
+	steps := 26501365
+	ans65 := bfs(grid, start, innerWidth)
+	ans186 := bfs(grid, start, 1*len(grid)+innerWidth)
+	ans327 := bfs(grid, start, 2*len(grid)+innerWidth)
+	a, b, c := fitQuadratic(ans65, ans186, ans327)
+	n := steps / len(grid)
+	ansP2 := a*n*n + b*n + c
 
-	// Solution here
-	fmt.Println("Solution:", ans)
+	fmt.Println("Solution Part 1:", ansP1)
+	fmt.Println("Solution Part 2:", ansP2)
 }
 
 type PathPoint struct {
@@ -54,7 +62,6 @@ func bfs(grid [][]string, start image.Point, steps int) int {
 	unprocessed := []PathPoint{{start, 0}}
 	plots := make(map[image.Point]PathPoint, 17161)
 	seen := make(map[PathPoint]bool)
-	//var paths []PathPoint
 	for len(unprocessed) > 0 {
 		curr := unprocessed[0]
 		unprocessed = unprocessed[1:]
@@ -64,7 +71,7 @@ func bfs(grid [][]string, start image.Point, steps int) int {
 			continue
 		}
 
-		if (grid[curr.Pos.Y][curr.Pos.X] == "." || grid[curr.Pos.Y][curr.Pos.X] == "S") && curr.length == steps {
+		if getTileElement(grid, curr.Pos.X, curr.Pos.Y) != "#" && curr.length == steps {
 			_, exists := plots[curr.Pos]
 			if !exists {
 				plots[curr.Pos] = curr
@@ -79,10 +86,7 @@ func bfs(grid [][]string, start image.Point, steps int) int {
 
 		for _, dir := range DIRS {
 			next := curr.Pos.Add(dir)
-			if next.X < 0 || next.X >= len(grid[0]) || next.Y < 0 || next.Y >= len(grid) {
-				continue
-			}
-			if grid[next.Y][next.X] == "#" {
+			if getTileElement(grid, next.X, next.Y) == "#" {
 				continue
 			}
 			unprocessed = append(unprocessed, PathPoint{next, curr.length + 1})
@@ -92,6 +96,32 @@ func bfs(grid [][]string, start image.Point, steps int) int {
 	}
 
 	return len(plots)
+}
+
+func getTileElement(grid [][]string, x, y int) string {
+	rows := len(grid)
+	cols := len(grid[0])
+
+	if x < 0 {
+		x = (x%cols + cols) % cols
+	} else {
+		x = x % cols
+	}
+
+	if y < 0 {
+		y = (y%rows + rows) % rows
+	} else {
+		y = y % rows
+	}
+
+	return grid[y][x]
+}
+
+func fitQuadratic(v0, v1, v2 int) (int, int, int) {
+	a := (v0 - 2*v1 + v2) / 2
+	b := (-3*v0 + 4*v1 - v2) / 2
+	c := v0
+	return a, b, c
 }
 
 func PrintGrid(grid [][]string, desc string) {

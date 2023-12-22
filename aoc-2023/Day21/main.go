@@ -40,7 +40,7 @@ func main() {
 	ansP1 := bfs(grid, start, 64)
 
 	//Part 2 - Sequence Spotting for 1x, 2x and 3x step ranges sizes
-	innerWidth := 65
+	innerWidth := 35
 	steps := 26501365
 	ans65 := bfs(grid, start, innerWidth)
 	ans186 := bfs(grid, start, 1*len(grid)+innerWidth)

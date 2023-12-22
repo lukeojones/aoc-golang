@@ -31,9 +31,9 @@ func main() {
 	//1,1,8~1,1,9
 	lines := strings.Split(input, "\n")
 	for _, line := range lines {
-		brickstr := strings.Split(line, "~")
-		brick1 := strings.Split(brickstr[0], ",")
-		brick2 := strings.Split(brickstr[1], ",")
+		brickStr := strings.Split(line, "~")
+		brick1 := strings.Split(brickStr[0], ",")
+		brick2 := strings.Split(brickStr[1], ",")
 
 		brick := Brick{
 			p1: image.Point{X: toInt(brick1[0]), Y: toInt(brick1[1])},
@@ -61,31 +61,31 @@ func main() {
 		supported := false
 		for (brick.z1 > 1 && brick.z2 > 1) && !supported {
 			// Slide down
-			brick.z1--
-			brick.z2--
-			bricks[bi] = brick
+			temp := brick
+			temp.z1--
+			temp.z2--
 
 			// Check if we overlap with any other bricks
-			needUndo := false
+			overlaps := false
 			for bu := bi - 1; bu >= 0; bu-- {
 				under := bricks[bu]
 				if bi == bu {
 					continue
 				}
-				if doOverlap(brick, under) {
+				if doOverlap(temp, under) {
 					// Undo the move and record dependency
 					brickToBricksItSupports[under] = append(brickToBricksItSupports[under], brick)
 					bricksToBricksItIsSupportedBy[brick] = append(bricksToBricksItIsSupportedBy[brick], under)
-					needUndo = true
+					overlaps = true
 				}
 			}
 
-			if needUndo {
-				brick.z1++
-				brick.z2++
-				bricks[bi] = brick
+			if overlaps {
 				supported = true
+			} else {
+				brick = temp
 			}
+			bricks[bi] = brick
 		}
 	}
 
@@ -96,8 +96,50 @@ func main() {
 		return minZi < minZj
 	})
 
-	ansP1 := 0
+	ansP1 := solveP1(bricks, brickToBricksItSupports, bricksToBricksItIsSupportedBy)
 
+	// Part 2
+	ansP2 := 0
+	for bi, brick := range bricks {
+		//println("Brick", bi)
+		ansBrick := 0
+		removed := make(map[Brick]bool)
+
+		unprocessed := []Brick{brick}
+		removed[brick] = true
+		for len(unprocessed) > 0 {
+			toDisintegrate := unprocessed[0]
+			unprocessed = unprocessed[1:]
+			bricksItSupports := brickToBricksItSupports[toDisintegrate]
+
+			for _, brickItSupports := range bricksItSupports {
+				hasOtherSupport := false
+				otherSupports := bricksToBricksItIsSupportedBy[brickItSupports]
+				for _, otherSupport := range otherSupports {
+					if !removed[otherSupport] {
+						hasOtherSupport = true
+					}
+				}
+
+				if !hasOtherSupport && removed[brickItSupports] == false {
+					ansBrick++
+					removed[brickItSupports] = true
+					//unprocessed = append([]Brick{brickItSupports}, unprocessed...)
+					unprocessed = append(unprocessed, brickItSupports)
+				}
+			}
+		}
+		println("Brick ", bi, "caused", ansBrick, "bricks to fall")
+		ansP2 += ansBrick
+	}
+
+	// Solution here
+	fmt.Println("Solution Part 1:", ansP1) //57008, 549 is too high
+	fmt.Println("Solution Part 2:", ansP2) //1394 is too low, 40000 is too low, 81424 is too high, 79042
+}
+
+func solveP1(bricks []Brick, brickToBricksItSupports, bricksToBricksItIsSupportedBy map[Brick][]Brick) int {
+	ansP1 := 0
 	for _, brickToRemove := range bricks {
 		bricksItSupports := brickToBricksItSupports[brickToRemove]
 		if bricksItSupports == nil || len(bricksItSupports) == 0 {
@@ -124,45 +166,7 @@ func main() {
 			ansP1++
 		}
 	}
-
-	// Part 2
-	ansP2 := 0
-	for bi, brick := range bricks {
-		println("Brick", bi)
-		ansBrick := 0
-		removed := make(map[Brick]bool)
-
-		unprocessed := []Brick{brick}
-		removed[brick] = true
-		for len(unprocessed) > 0 {
-			toDisintegrate := unprocessed[0]
-			unprocessed = unprocessed[1:]
-			bricksItSupports := brickToBricksItSupports[toDisintegrate]
-
-			for _, brickItSupports := range bricksItSupports {
-				hasOtherSupport := false
-				otherSupports := bricksToBricksItIsSupportedBy[brickItSupports]
-				for _, otherSupport := range otherSupports {
-					if !removed[otherSupport] {
-						hasOtherSupport = true
-					}
-				}
-
-				if !hasOtherSupport && removed[brickItSupports] == false {
-					ansBrick++
-					removed[brickItSupports] = true
-					unprocessed = append([]Brick{brickItSupports}, unprocessed...)
-				}
-			}
-		}
-		println(ansBrick)
-		ansP2 += ansBrick
-	}
-
-	fmt.Println("Part 2:", ansP2) //1394 is too low
-
-	// Solution here
-	fmt.Println("Solution:", ansP1) //57008, 549 is too high
+	return ansP1
 }
 
 type Brick struct {
@@ -178,8 +182,6 @@ func doOverlap(top, bottom Brick) bool {
 	x2Min, x2Max := minMax(bottom.p1.X, bottom.p2.X)
 	y2Min, y2Max := minMax(bottom.p1.Y, bottom.p2.Y)
 	z2Min, z2Max := minMax(bottom.z1, bottom.z2)
-
-	//zmin := min(top.z1, top.z2)dd
 
 	// Check if one rectangle is on the left side of the other
 	if x1Max < x2Min || x2Max < x1Min {
@@ -223,7 +225,7 @@ func min(a, b int) int {
 
 // Boilerplate: ReadInput reads the input file for the given year and day
 func readInput(year, day int) (string, error) {
-	filePath := fmt.Sprintf("aoc-%d/Day%d/input.test.txt", year, day)
+	filePath := fmt.Sprintf("aoc-%d/Day%d/input.txt", year, day)
 	file, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Fatal(err)
